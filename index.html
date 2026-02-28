@@ -437,6 +437,67 @@ label { font-size: 0.76rem; font-weight: 600; color: var(--text2); display: bloc
   .cl-saldo-total { padding: 0.5rem 0.75rem; }
   .cl-saldo-val { font-size: 1.1rem; }
 }
+/* COBRO DEL DÍA */
+.cobro-header-bar {
+  background: linear-gradient(135deg, var(--sidebar-bg) 0%, #1f3558 100%);
+  border-radius: 12px; padding: 1rem 1.25rem; margin-bottom: 1.25rem;
+  display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;
+}
+.cobro-stat { text-align: center; }
+.cobro-stat-val { font-size: 1.4rem; font-weight: 700; color: white; line-height: 1; }
+.cobro-stat-lbl { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.08em; color: #8a9bb0; margin-top: 3px; }
+.cobro-stat-sep { width: 1px; height: 36px; background: #2a4060; flex-shrink: 0; }
+.cobro-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  margin-bottom: 0.65rem; overflow: hidden;
+}
+.cobro-card-head {
+  padding: 0.85rem 1rem; display: flex; align-items: center; gap: 0.85rem; cursor: pointer;
+}
+.cobro-prioridad { width: 5px; border-radius: 4px; align-self: stretch; flex-shrink: 0; min-height: 36px; }
+.cobro-prioridad.rojo { background: var(--rojo); }
+.cobro-prioridad.amarillo { background: #f59e0b; }
+.cobro-info { flex: 1; min-width: 0; }
+.cobro-nombre { font-weight: 700; font-size: 0.95rem; }
+.cobro-meta { font-size: 0.74rem; color: var(--text3); margin-top: 2px; }
+.cobro-right { text-align: right; flex-shrink: 0; }
+.cobro-saldo { font-size: 1rem; font-weight: 700; color: var(--rojo); }
+.cobro-tel-btn {
+  background: var(--verde); color: white; border: none; border-radius: 8px;
+  padding: 0.5rem 0.75rem; font-size: 1.15rem; cursor: pointer; flex-shrink: 0;
+  text-decoration: none; display: flex; align-items: center; line-height: 1;
+}
+.cobro-tel-btn:hover { opacity: 0.85; }
+.cobro-tel-btn.sin-cel { background: #d1d5db; cursor: default; pointer-events: none; }
+.cobro-actions { padding: 0 1rem 0.9rem; display: none; flex-direction: column; gap: 0.6rem; }
+.cobro-actions.open { display: flex; }
+.cobro-res-btns { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+.cobro-rbtn {
+  padding: 0.38rem 0.72rem; border-radius: 20px; border: 2px solid var(--border);
+  background: none; cursor: pointer; font-size: 0.76rem; font-family: inherit;
+  color: var(--text2); transition: all 0.12s; white-space: nowrap;
+}
+.cobro-rbtn:hover { border-color: var(--text2); color: var(--text); }
+.cobro-rbtn.sel-promesa { border-color: #f59e0b; background: #f59e0b; color: white; }
+.cobro-rbtn.sel-nocontesta { border-color: #6b7280; background: #6b7280; color: white; }
+.cobro-rbtn.sel-negado { border-color: var(--rojo); background: var(--rojo); color: white; }
+.cobro-rbtn.sel-other { border-color: #374151; background: #374151; color: white; }
+.cobro-nota-row { display: flex; gap: 0.5rem; align-items: center; }
+.cobro-nota-row .fc { flex: 1; font-size: 0.84rem; padding: 0.45rem 0.7rem; }
+.cobro-guardar {
+  background: var(--accent); color: white; border: none; border-radius: 8px;
+  padding: 0.5rem 1rem; font-family: inherit; font-size: 0.84rem; font-weight: 600;
+  cursor: pointer; white-space: nowrap; flex-shrink: 0;
+}
+.cobro-guardar:hover { background: var(--accent2); }
+.cobro-done { display: none; align-items: center; gap: 0.4rem; font-size: 0.78rem; color: var(--verde); font-weight: 600; padding: 0 1rem 0.75rem; }
+.cobro-done.show { display: flex; }
+@media (max-width: 860px) {
+  .cobro-nota-row { flex-wrap: wrap; }
+  .cobro-nota-row .fc { min-width: 100%; }
+  .cobro-guardar { width: 100%; text-align: center; }
+  .cobro-stat-val { font-size: 1.1rem; }
+}
 .mobile-nav {
   display: none;
   position: fixed;
@@ -539,6 +600,10 @@ label { font-size: 0.76rem; font-weight: 600; color: var(--text2); display: bloc
     <div class="nav-section">Acciones</div>
     <div class="nav-item" id="nav-nueva" onclick="go('nueva')">
       <span class="nav-icon">➕</span> Nueva remisión
+    </div>
+    <div class="nav-item operadora-only" id="nav-cobro" onclick="go('cobro')" style="display:none">
+      <span class="nav-icon">📞</span> Cobro del día
+      <span class="nav-badge" id="badge-cobro" style="background:#ef4444">0</span>
     </div>
     <div class="nav-item admin-only" id="nav-historial" onclick="go('historial')">
       <span class="nav-icon">📖</span> Historial gestiones
@@ -721,6 +786,36 @@ label { font-size: 0.76rem; font-weight: 600; color: var(--text2); display: bloc
           <button class="btn-secondary" onclick="limpiarNueva()">Limpiar</button>
         </div>
       </div>
+    </div>
+
+    <!-- COBRO DEL DÍA -->
+    <div class="view" id="view-cobro">
+      <div class="page-header">
+        <div class="page-title">Cobro del día</div>
+        <div class="page-sub">Clientes urgentes — mora y alerta</div>
+      </div>
+      <div class="cobro-header-bar">
+        <div class="cobro-stat">
+          <div class="cobro-stat-val" id="cobro-total-clientes">0</div>
+          <div class="cobro-stat-lbl">Para llamar</div>
+        </div>
+        <div class="cobro-stat-sep"></div>
+        <div class="cobro-stat">
+          <div class="cobro-stat-val" id="cobro-gestionados">0</div>
+          <div class="cobro-stat-lbl">Gestionados hoy</div>
+        </div>
+        <div class="cobro-stat-sep"></div>
+        <div class="cobro-stat">
+          <div class="cobro-stat-val" id="cobro-saldo-urgente">$0</div>
+          <div class="cobro-stat-lbl">Saldo urgente</div>
+        </div>
+        <div class="cobro-stat-sep"></div>
+        <div class="cobro-stat">
+          <div class="cobro-stat-val" id="cobro-pct-gestionado">0%</div>
+          <div class="cobro-stat-lbl">% gestionado</div>
+        </div>
+      </div>
+      <div id="cobro-list"></div>
     </div>
 
     <!-- HISTORIAL -->
@@ -1044,11 +1139,12 @@ function doLogin() {
     badge.textContent = '👩‍💼 Operadora';
     badge.className = 'role-badge operadora';
     document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
-    // Operadora starts on activas
+    document.querySelectorAll('.operadora-only').forEach(el => el.style.display = 'flex');
+    // Operadora starts on cobro
     document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
     document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-    document.getElementById('view-activas').classList.add('active');
-    document.getElementById('nav-activas').classList.add('active');
+    document.getElementById('view-cobro').classList.add('active');
+    document.getElementById('nav-cobro').classList.add('active');
   }
   buildMobileNav();
   loadAll();
@@ -1131,6 +1227,7 @@ async function loadAll() {
     updateSidebar();
     updateMobileBadges();
     if (isAdmin()) renderDashboard();
+    else renderCobro();
     updateClientesList();
     // Auto-refresh every 2 min
     clearInterval(window._refreshTimer);
@@ -1553,8 +1650,141 @@ async function guardarGestionCliente(nombreCliente) {
 }
 
 // ============================================================
-// PENDIENTES
+// COBRO DEL DÍA
 // ============================================================
+let cobroGestionadosHoy = new Set(); // ids de clientes gestionados en esta sesión
+let cobroResultados = {}; // { nombreCliente: resultadoSel }
+
+function renderCobro() {
+  // Solo mora (+60d) y alerta (30-60d)
+  const activas = remisiones.filter(r => r.estado !== 'cancelada' && r.estado !== 'eliminada' && saldo(r) > 0);
+  const urgentes = activas.filter(r => diasDesde(r.fecha) > 30);
+
+  // Agrupar por cliente
+  const grupos = {};
+  urgentes.forEach(r => {
+    if (!grupos[r.cliente]) grupos[r.cliente] = { cliente: r.cliente, cel: r.cel, rems: [] };
+    grupos[r.cliente].rems.push(r);
+  });
+
+  const lista = Object.values(grupos).sort((a,b) => {
+    const maxA = Math.max(...a.rems.map(r=>diasDesde(r.fecha)));
+    const maxB = Math.max(...b.rems.map(r=>diasDesde(r.fecha)));
+    return maxB - maxA; // más antiguos primero
+  });
+
+  const totalSaldoUrgente = lista.reduce((s,g) => s + g.rems.reduce((ss,r)=>ss+saldo(r),0), 0);
+  const gestionados = cobroGestionadosHoy.size;
+  const pct = lista.length > 0 ? Math.round(gestionados / lista.length * 100) : 0;
+
+  document.getElementById('cobro-total-clientes').textContent = lista.length;
+  document.getElementById('cobro-gestionados').textContent = gestionados;
+  document.getElementById('cobro-saldo-urgente').textContent = fmt(totalSaldoUrgente);
+  document.getElementById('cobro-pct-gestionado').textContent = pct + '%';
+  document.getElementById('badge-cobro').textContent = lista.length - gestionados;
+  const mobBadge = document.getElementById('mob-b-cobro');
+  if (mobBadge) mobBadge.textContent = lista.length - gestionados;
+
+  const wrap = document.getElementById('cobro-list');
+  if (!lista.length) {
+    wrap.innerHTML = '<div class="empty"><div class="empty-icon">🎉</div>¡Sin clientes urgentes hoy!</div>';
+    return;
+  }
+
+  wrap.innerHTML = lista.map(g => {
+    const totalSaldo = g.rems.reduce((s,r)=>s+saldo(r),0);
+    const maxDias = Math.max(...g.rems.map(r=>diasDesde(r.fecha)));
+    const color = colorDias(maxDias);
+    const yaGestionado = cobroGestionadosHoy.has(g.cliente);
+    const nRems = g.rems.length;
+    const clienteId = g.cliente.replace(/[^a-zA-Z0-9]/g,'_');
+    const telBtn = g.cel
+      ? `<a class="cobro-tel-btn" href="tel:${g.cel}" onclick="event.stopPropagation()">📞</a>`
+      : `<span class="cobro-tel-btn sin-cel" title="Sin celular registrado">📵</span>`;
+
+    return `<div class="cobro-card" id="ccard-${clienteId}">
+      <div class="cobro-card-head" onclick="toggleCobroCard('${clienteId}')">
+        <div class="cobro-prioridad ${color}"></div>
+        ${telBtn}
+        <div class="cobro-info">
+          <div class="cobro-nombre">${g.cliente}</div>
+          <div class="cobro-meta">${g.cel||'Sin celular'} · ${nRems} remisión${nRems!==1?'es':''} · max ${maxDias}d</div>
+        </div>
+        <div class="cobro-right">
+          <div class="cobro-saldo">${fmt(totalSaldo)}</div>
+          <div class="cobro-dias">${badgeDias(maxDias)}</div>
+        </div>
+      </div>
+      <div class="cobro-actions" id="cactions-${clienteId}">
+        <div class="cobro-res-btns" id="cres-${clienteId}">
+          <button class="cobro-rbtn" onclick="selCobroR('${clienteId}','promesa',this)">🟡 Prometió pagar</button>
+          <button class="cobro-rbtn" onclick="selCobroR('${clienteId}','nocontesta',this)">📵 No contestó</button>
+          <button class="cobro-rbtn" onclick="selCobroR('${clienteId}','negado',this)">🚫 Se negó</button>
+          <button class="cobro-rbtn" onclick="selCobroR('${clienteId}','equivocado',this)">❌ N° equivocado</button>
+          <button class="cobro-rbtn" onclick="selCobroR('${clienteId}','nodisponible',this)">📴 No disponible</button>
+        </div>
+        <div class="cobro-nota-row">
+          <input class="fc" type="text" id="cnota-${clienteId}" placeholder="Nota rápida (opcional)...">
+          <button class="cobro-guardar" onclick="guardarCobroGestion('${g.cliente}','${clienteId}')">Guardar</button>
+        </div>
+      </div>
+      ${yaGestionado ? `<div class="cobro-done show" id="cdone-${clienteId}">✅ Gestionado hoy</div>` : `<div class="cobro-done" id="cdone-${clienteId}">✅ Gestionado hoy</div>`}
+    </div>`;
+  }).join('');
+}
+
+function toggleCobroCard(clienteId) {
+  const actions = document.getElementById('cactions-'+clienteId);
+  actions.classList.toggle('open');
+}
+
+function selCobroR(clienteId, resultado, btn) {
+  cobroResultados[clienteId] = resultado;
+  const container = document.getElementById('cres-'+clienteId);
+  container.querySelectorAll('.cobro-rbtn').forEach(b => b.className = 'cobro-rbtn');
+  btn.className = `cobro-rbtn sel-${resultado==='equivocado'||resultado==='nodisponible'?'other':resultado}`;
+}
+
+async function guardarCobroGestion(nombreCliente, clienteId) {
+  const resultado = cobroResultados[clienteId];
+  if (!resultado) { toast('Selecciona un resultado primero', true); return; }
+  const nota = document.getElementById('cnota-'+clienteId)?.value.trim() || '';
+  const fecha = new Date().toISOString().slice(0,10);
+
+  const rems = remisiones.filter(r =>
+    r.cliente === nombreCliente &&
+    r.estado !== 'cancelada' && r.estado !== 'eliminada' && saldo(r) > 0
+  );
+
+  toast('Guardando...');
+  try {
+    for (const r of rems) {
+      const id = genId();
+      await apiAppend('Gestiones', [id, fecha, r.id, resultado, nota]);
+      gestiones.push({ id, fecha, remId: r.id, resultado, nota });
+    }
+    cobroGestionadosHoy.add(nombreCliente);
+    delete cobroResultados[clienteId];
+    toast(`Gestión guardada ✓`);
+    // Marcar como hecho en la UI sin re-renderizar todo
+    document.getElementById('cactions-'+clienteId)?.classList.remove('open');
+    const done = document.getElementById('cdone-'+clienteId);
+    if (done) done.classList.add('show');
+    // Actualizar contadores
+    const gestionados = cobroGestionadosHoy.size;
+    const total = parseInt(document.getElementById('cobro-total-clientes').textContent) || 0;
+    const pct = total > 0 ? Math.round(gestionados / total * 100) : 0;
+    document.getElementById('cobro-gestionados').textContent = gestionados;
+    document.getElementById('cobro-pct-gestionado').textContent = pct + '%';
+    document.getElementById('badge-cobro').textContent = Math.max(0, total - gestionados);
+    const mobBadge = document.getElementById('mob-b-cobro');
+    if (mobBadge) mobBadge.textContent = Math.max(0, total - gestionados);
+  } catch(e) {
+    toast('Error guardando', true);
+  }
+}
+
+
 function renderPendientes() {
   const lista = remisiones.filter(r => r.estado !== 'cancelada' && r.estado !== 'eliminada' && saldo(r) > 0 && diasDesde(r.fecha) > 30)
     .sort((a,b) => saldo(b)-saldo(a));
@@ -1922,14 +2152,16 @@ function buildMobileNav() {
   const items = [
     ...(isAdm ? [{ id:'dashboard', icon:'📊', label:'Resumen', badge:'' }] : []),
     { id:'activas', icon:'📋', label:'Remisiones', badge:'badge-activas' },
+    ...(!isAdm ? [{ id:'cobro', icon:'📞', label:'Cobro', badge:'cobro', badgeClass:'' }] : []),
     { id:'nueva', icon:'➕', label:'Nueva', badge:'' },
     ...(isAdm ? [{ id:'pendientes', icon:'🔔', label:'Pendientes', badge:'badge-pendientes', badgeClass:'amarillo' }] : []),
     ...(isAdm ? [{ id:'historial', icon:'📖', label:'Historial', badge:'' }] : []),
     ...(isAdm ? [{ id:'reportes', icon:'📈', label:'Reportes', badge:'' }] : []),
   ];
+  const defaultView = isAdm ? 'dashboard' : 'cobro';
   const nav = document.getElementById('mob-nav-inner');
   nav.innerHTML = items.map(item => `
-    <button class="mob-nav-item ${item.id === (isAdm ? 'dashboard' : 'activas') ? 'active' : ''}"
+    <button class="mob-nav-item ${item.id === defaultView ? 'active' : ''}"
       id="mob-${item.id}" onclick="go('${item.id}')">
       <span class="mob-icon">${item.icon}${item.badge ? `<span class="mob-badge ${item.badgeClass||''}" id="mob-b-${item.id}">0</span>` : ''}</span>
       <span class="mob-label">${item.label}</span>
@@ -1963,6 +2195,7 @@ function go(v) {
   if (v==='pendientes') renderPendientes();
   if (v==='historial') renderHistorial();
   if (v==='reportes') renderReportes();
+  if (v==='cobro') renderCobro();
   if (v==='nueva') { document.getElementById('n-fecha').value = new Date().toISOString().slice(0,10); }
 }
 
