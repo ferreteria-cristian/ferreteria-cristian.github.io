@@ -1228,15 +1228,29 @@ function renderDashboard() {
   document.getElementById('s-facturado').textContent = fmt(totalFacturado);
   document.getElementById('s-pct').textContent = pct + '%';
 
-  const top = [...activas].sort((a,b)=>saldo(b)-saldo(a)).slice(0,10);
+  // Agrupar por cliente para la tabla de mayores deudas
+  const grupos = {};
+  activas.forEach(r => {
+    if (!grupos[r.cliente]) grupos[r.cliente] = { cliente: r.cliente, cel: r.cel, rems: [] };
+    grupos[r.cliente].rems.push(r);
+  });
+  const topClientes = Object.values(grupos)
+    .map(g => ({
+      cliente: g.cliente, cel: g.cel,
+      totalSaldo: g.rems.reduce((s,r)=>s+saldo(r),0),
+      nRems: g.rems.length,
+      maxDias: Math.max(...g.rems.map(r=>diasDesde(r.fecha)))
+    }))
+    .sort((a,b)=>b.totalSaldo-a.totalSaldo).slice(0,10);
+
   const wrap = document.getElementById('top-wrap');
-  if (!top.length) { wrap.innerHTML = '<div class="empty"><div class="empty-icon">✅</div>Sin remisiones activas</div>'; return; }
-  wrap.innerHTML = `<table><thead><tr><th>Cliente</th><th>Saldo</th><th>Estado</th><th>Días</th></tr></thead><tbody>
-    ${top.map(r => `<tr onclick="abrirRemision('${r.id}')">
-      <td class="td-main">${r.cliente}<small>${r.cel||'Sin celular'} · Rem. ${r.num||'—'}</small></td>
-      <td class="td-mono" data-label="Saldo">${fmt(saldo(r))}</td>
-      <td data-label="Estado">${badgeDias(diasDesde(r.fecha))}</td>
-      <td data-label="Días">${diasTag(diasDesde(r.fecha))}</td>
+  if (!topClientes.length) { wrap.innerHTML = '<div class="empty"><div class="empty-icon">✅</div>Sin remisiones activas</div>'; return; }
+  wrap.innerHTML = `<table><thead><tr><th>Cliente</th><th>Saldo total</th><th>Estado</th><th>Días max</th></tr></thead><tbody>
+    ${topClientes.map(g => `<tr onclick="abrirCliente('${g.cliente.replace(/'/g,"\\'")}')">
+      <td class="td-main">${g.cliente}<small>${g.cel||'Sin celular'} · ${g.nRems} remisión${g.nRems!==1?'es':''}</small></td>
+      <td class="td-mono" data-label="Saldo">${fmt(g.totalSaldo)}</td>
+      <td data-label="Estado">${badgeDias(g.maxDias)}</td>
+      <td data-label="Días">${diasTag(g.maxDias)}</td>
     </tr>`).join('')}
   </tbody></table>`;
 }
@@ -1332,6 +1346,25 @@ function abrirCliente(nombreCliente) {
   // Panel de gestión general del cliente
   const gestionGeneralHTML = `
   <div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:1rem;margin-bottom:0.25rem">
+    <div class="sec-title" style="margin-bottom:0.75rem">💰 Registrar abono general</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;margin-bottom:0.75rem">
+      <div>
+        <label style="font-size:0.75rem;color:var(--text2);display:block;margin-bottom:4px">Monto del abono</label>
+        <input class="fc" type="number" id="cl-abono-val" placeholder="$0" style="font-size:1rem;font-weight:700">
+      </div>
+      <div>
+        <label style="font-size:0.75rem;color:var(--text2);display:block;margin-bottom:4px">Aplicar a</label>
+        <select class="fc" id="cl-abono-modo">
+          <option value="mayor">Remisión más antigua primero</option>
+          <option value="menor">Remisión más reciente primero</option>
+          <option value="unica">Solo si es una remisión</option>
+        </select>
+      </div>
+    </div>
+    <input class="fc" type="text" id="cl-abono-nota" placeholder="Nota del abono..." style="margin-bottom:0.75rem">
+    <button class="btn-primary" style="width:100%;background:var(--verde);border-color:var(--verde)" onclick="guardarAbonoCliente('${nombreCliente}')">💾 Guardar abono</button>
+  </div>
+  <div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:1rem;margin-bottom:0.25rem">
     <div class="sec-title" style="margin-bottom:0.75rem">📞 Gestión de cobro general</div>
     <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.75rem" id="cl-res-btns">
       <button class="rbtn" onclick="clSelR('promesa',this)">🟡 Prometió pagar</button>
@@ -1412,6 +1445,60 @@ function abrirEditarDesdeCliente(remId) {
 }
 
 let clResultadoActual = '';
+
+async function guardarAbonoCliente(nombreCliente) {
+  const valor = parseFloat(document.getElementById('cl-abono-val')?.value) || 0;
+  if (valor <= 0) { toast('Ingresa un monto válido', true); return; }
+  const nota = document.getElementById('cl-abono-nota')?.value.trim() || '';
+  const modo = document.getElementById('cl-abono-modo')?.value || 'mayor';
+  const fecha = new Date().toISOString().slice(0,10);
+
+  let rems = remisiones.filter(r =>
+    r.cliente === nombreCliente &&
+    r.estado !== 'cancelada' && r.estado !== 'eliminada' && saldo(r) > 0
+  );
+
+  if (modo === 'mayor') rems.sort((a,b) => diasDesde(b.fecha)-diasDesde(a.fecha)); // más antigua primero
+  else if (modo === 'menor') rems.sort((a,b) => diasDesde(a.fecha)-diasDesde(b.fecha)); // más reciente primero
+  else if (modo === 'unica' && rems.length !== 1) { toast('Este modo solo aplica si hay una remisión activa', true); return; }
+
+  toast('Guardando abono...');
+  let restante = valor;
+  try {
+    for (const r of rems) {
+      if (restante <= 0) break;
+      const aSaldo = saldo(r);
+      const aAplicar = Math.min(restante, aSaldo);
+      restante -= aAplicar;
+
+      const id = genId();
+      const row = [id, fecha, r.id, aAplicar, nota];
+      await apiAppend('Abonos', row);
+
+      const nuevoAbonado = r.abonado + aAplicar;
+      const nuevoEstado = nuevoAbonado >= r.total ? 'cancelada' : r.estado;
+      const urlUpd = `${API}?action=updateById&sheet=Remisiones&id=${r.id}&values=${encodeURIComponent(JSON.stringify([
+        r.id, r.fecha, r.cliente, r.cel, r.doc||'', r.num, r.total, nuevoAbonado, nuevoEstado
+      ]))}`;
+      await fetch(urlUpd);
+
+      abonos.push({ id, fecha, remId: r.id, valor: aAplicar, nota });
+      r.abonado = nuevoAbonado;
+      r.estado = nuevoEstado;
+    }
+
+    if (restante > 0) toast(`Abono guardado. Sobraron ${fmt(restante)} (mayor al saldo total)`, false);
+    else toast(`Abono de ${fmt(valor)} aplicado ✓`);
+
+    document.getElementById('cl-abono-val').value = '';
+    document.getElementById('cl-abono-nota').value = '';
+    updateSidebar();
+    renderDashboard();
+    abrirCliente(nombreCliente);
+  } catch(e) {
+    toast('Error guardando abono', true);
+  }
+}
 function clSelR(r, btn) {
   clResultadoActual = r;
   document.querySelectorAll('#cl-res-btns .rbtn').forEach(b=>b.classList.remove('active'));
