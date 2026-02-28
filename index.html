@@ -492,6 +492,25 @@ label { font-size: 0.76rem; font-weight: 600; color: var(--text2); display: bloc
 .cobro-guardar:hover { background: var(--accent2); }
 .cobro-done { display: none; align-items: center; gap: 0.4rem; font-size: 0.78rem; color: var(--verde); font-weight: 600; padding: 0 1rem 0.75rem; }
 .cobro-done.show { display: flex; }
+.cobro-abono-section {
+  margin: 0 1rem 0.75rem; background: var(--verde-bg);
+  border: 1px solid #a7f3d0; border-radius: 10px; padding: 0.75rem;
+  display: none; flex-direction: column; gap: 0.5rem;
+}
+.cobro-abono-section.open { display: flex; }
+.cobro-abono-title { font-size: 0.7rem; font-weight: 700; color: var(--verde); text-transform: uppercase; letter-spacing: 0.07em; }
+.cobro-abono-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+.cobro-abono-fields .fc { font-size: 0.84rem; padding: 0.42rem 0.65rem; }
+.cobro-abono-monto { font-size: 1rem !important; font-weight: 700 !important; color: var(--verde) !important; }
+.cobro-abono-btn {
+  background: var(--verde); color: white; border: none; border-radius: 8px;
+  padding: 0.5rem; font-family: inherit; font-size: 0.84rem; font-weight: 600;
+  cursor: pointer; width: 100%;
+}
+.cobro-abono-btn:hover { background: #1e4d38; }
+@media (max-width: 860px) {
+  .cobro-abono-fields { grid-template-columns: 1fr; }
+}
 @media (max-width: 860px) {
   .cobro-nota-row { flex-wrap: wrap; }
   .cobro-nota-row .fc { min-width: 100%; }
@@ -1721,11 +1740,30 @@ function renderCobro() {
           <button class="cobro-rbtn" onclick="selCobroR('${clienteId}','negado',this)">🚫 Se negó</button>
           <button class="cobro-rbtn" onclick="selCobroR('${clienteId}','equivocado',this)">❌ N° equivocado</button>
           <button class="cobro-rbtn" onclick="selCobroR('${clienteId}','nodisponible',this)">📴 No disponible</button>
+          <button class="cobro-rbtn" style="border-color:var(--verde);color:var(--verde)" onclick="toggleAbonoRapido('${clienteId}',this)">💰 Recibió pago</button>
         </div>
         <div class="cobro-nota-row">
           <input class="fc" type="text" id="cnota-${clienteId}" placeholder="Nota rápida (opcional)...">
-          <button class="cobro-guardar" onclick="guardarCobroGestion('${g.cliente}','${clienteId}')">Guardar</button>
+          <button class="cobro-guardar" onclick="guardarCobroGestion('${g.cliente}','${clienteId}')">Guardar gestión</button>
         </div>
+      </div>
+      <div class="cobro-abono-section" id="cabono-${clienteId}">
+        <div class="cobro-abono-title">💰 Registrar pago recibido</div>
+        <div class="cobro-abono-fields">
+          <div>
+            <label style="font-size:0.72rem;color:var(--verde);margin-bottom:3px;display:block">Monto</label>
+            <input class="fc cobro-abono-monto" type="text" inputmode="numeric" id="cabono-monto-${clienteId}" placeholder="$0" oninput="fmtInput(this)" onkeyup="fmtInput(this)">
+          </div>
+          <div>
+            <label style="font-size:0.72rem;color:var(--verde);margin-bottom:3px;display:block">Fecha</label>
+            <input class="fc" type="date" id="cabono-fecha-${clienteId}" value="${new Date().toISOString().slice(0,10)}">
+          </div>
+        </div>
+        <div>
+          <label style="font-size:0.72rem;color:var(--verde);margin-bottom:3px;display:block">Nota</label>
+          <input class="fc" type="text" id="cabono-nota-${clienteId}" placeholder="Efectivo, transferencia, Nequi...">
+        </div>
+        <button class="cobro-abono-btn" onclick="guardarAbonoRapido('${g.cliente}','${clienteId}')">💾 Guardar pago + marcar gestionado</button>
       </div>
       ${yaGestionado ? `<div class="cobro-done show" id="cdone-${clienteId}">✅ Gestionado hoy</div>` : `<div class="cobro-done" id="cdone-${clienteId}">✅ Gestionado hoy</div>`}
     </div>`;
@@ -1735,6 +1773,96 @@ function renderCobro() {
 function toggleCobroCard(clienteId) {
   const actions = document.getElementById('cactions-'+clienteId);
   actions.classList.toggle('open');
+  // Cerrar abono si se colapsa la tarjeta
+  if (!actions.classList.contains('open')) {
+    document.getElementById('cabono-'+clienteId)?.classList.remove('open');
+  }
+}
+
+function toggleAbonoRapido(clienteId, btn) {
+  const section = document.getElementById('cabono-'+clienteId);
+  const isOpen = section.classList.toggle('open');
+  // Marcar botón visualmente
+  btn.className = isOpen
+    ? 'cobro-rbtn sel-other'
+    : 'cobro-rbtn';
+  btn.style.borderColor = isOpen ? '' : 'var(--verde)';
+  btn.style.color = isOpen ? '' : 'var(--verde)';
+  if (isOpen) {
+    // Poner fecha de hoy si está vacía
+    const fechaEl = document.getElementById('cabono-fecha-'+clienteId);
+    if (fechaEl && !fechaEl.value) fechaEl.value = new Date().toISOString().slice(0,10);
+    document.getElementById('cabono-monto-'+clienteId)?.focus();
+  }
+}
+
+async function guardarAbonoRapido(nombreCliente, clienteId) {
+  const montoRaw = document.getElementById('cabono-monto-'+clienteId)?.value.replace(/\./g,'').replace(',','.') || '0';
+  const valor = parseFloat(montoRaw) || 0;
+  if (valor <= 0) { toast('Ingresa un monto válido', true); return; }
+  const nota = document.getElementById('cabono-nota-'+clienteId)?.value.trim() || '';
+  const fecha = document.getElementById('cabono-fecha-'+clienteId)?.value || new Date().toISOString().slice(0,10);
+
+  const rems = remisiones.filter(r =>
+    r.cliente === nombreCliente &&
+    r.estado !== 'cancelada' && r.estado !== 'eliminada' && saldo(r) > 0
+  ).sort((a,b) => diasDesde(b.fecha) - diasDesde(a.fecha)); // más antigua primero
+
+  if (!rems.length) { toast('Sin remisiones activas para este cliente', true); return; }
+
+  toast('Guardando pago...');
+  try {
+    // 1. Guardar abono(s) distribuyendo de más antigua a más reciente
+    let restante = valor;
+    for (const r of rems) {
+      if (restante <= 0) break;
+      const aAplicar = Math.min(restante, saldo(r));
+      restante -= aAplicar;
+      const id = genId();
+      await apiAppend('Abonos', [id, fecha, r.id, aAplicar, nota]);
+      const nuevoAbonado = r.abonado + aAplicar;
+      const nuevoEstado = nuevoAbonado >= r.total ? 'cancelada' : r.estado;
+      await fetch(`${API}?action=updateById&sheet=Remisiones&id=${r.id}&values=${encodeURIComponent(JSON.stringify([
+        r.id, r.fecha, r.cliente, r.cel, r.doc||'', r.num, r.total, nuevoAbonado, nuevoEstado
+      ]))}`);
+      abonos.push({ id, fecha, remId: r.id, valor: aAplicar, nota });
+      r.abonado = nuevoAbonado;
+      r.estado = nuevoEstado;
+    }
+
+    // 2. Guardar gestión "pago_recibido" para cada remisión
+    for (const r of rems) {
+      const id = genId();
+      await apiAppend('Gestiones', [id, fecha, r.id, 'pago_recibido', `Pago ${fmt(valor)}${nota?' · '+nota:''}`]);
+      gestiones.push({ id, fecha, remId: r.id, resultado: 'pago_recibido', nota });
+    }
+
+    // 3. Marcar como gestionado
+    cobroGestionadosHoy.add(nombreCliente);
+    delete cobroResultados[clienteId];
+
+    toast(`Pago de ${fmt(valor)} guardado ✓`);
+
+    // 4. Actualizar UI
+    document.getElementById('cabono-'+clienteId)?.classList.remove('open');
+    document.getElementById('cactions-'+clienteId)?.classList.remove('open');
+    const done = document.getElementById('cdone-'+clienteId);
+    if (done) { done.textContent = `✅ Pago recibido: ${fmt(valor)}`; done.classList.add('show'); }
+
+    // Actualizar contadores
+    const gestionados = cobroGestionadosHoy.size;
+    const total = parseInt(document.getElementById('cobro-total-clientes').textContent) || 0;
+    const pct = total > 0 ? Math.round(gestionados / total * 100) : 0;
+    document.getElementById('cobro-gestionados').textContent = gestionados;
+    document.getElementById('cobro-pct-gestionado').textContent = pct + '%';
+    document.getElementById('badge-cobro').textContent = Math.max(0, total - gestionados);
+    const mobBadge = document.getElementById('mob-b-cobro');
+    if (mobBadge) mobBadge.textContent = Math.max(0, total - gestionados);
+    updateSidebar();
+
+  } catch(e) {
+    toast('Error guardando pago', true);
+  }
 }
 
 function selCobroR(clienteId, resultado, btn) {
@@ -2023,8 +2151,8 @@ function autoFillCliente(nombre) {
 // ============================================================
 function renderHistorial() {
   const lista = [...gestiones].reverse().slice(0,60);
-  const iconos = {promesa:'🟡',nocontesta:'📵',negado:'🚫',equivocado:'❌',nodisponible:'📴',nota_inicial:'📝'};
-  const textos = {promesa:'Prometió pagar',nocontesta:'No contestó',negado:'Se negó a pagar',equivocado:'Número equivocado',nodisponible:'Número no disponible',nota_inicial:'Nota inicial'};
+  const iconos = {promesa:'🟡',nocontesta:'📵',negado:'🚫',equivocado:'❌',nodisponible:'📴',nota_inicial:'📝',pago_recibido:'💰'};
+  const textos = {promesa:'Prometió pagar',nocontesta:'No contestó',negado:'Se negó a pagar',equivocado:'Número equivocado',nodisponible:'Número no disponible',nota_inicial:'Nota inicial',pago_recibido:'Pago recibido'};
   const el = document.getElementById('hist-list');
   if (!lista.length) { el.innerHTML = '<div class="empty"><div class="empty-icon">📖</div>Sin gestiones registradas</div>'; return; }
   el.innerHTML = lista.map(g => {
