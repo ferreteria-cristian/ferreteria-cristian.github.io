@@ -1154,8 +1154,16 @@ function setConn(s) {
 // ============================================================
 function fmt(n) { return '$' + Math.round(n||0).toLocaleString('es-CO'); }
 function fmtInput(el) {
-  const raw = el.value.replace(/\D/g,'');
-  el.value = raw ? parseInt(raw,10).toLocaleString('es-CO') : '';
+  const raw = el.value.replace(/[^\d]/g,'');
+  if (!raw) { el.value = ''; return; }
+  const num = parseInt(raw, 10);
+  const formatted = num.toLocaleString('es-CO');
+  // Preserve cursor position
+  const selStart = el.selectionStart;
+  const prevLen = el.value.length;
+  el.value = formatted;
+  const newLen = el.value.length;
+  el.setSelectionRange(selStart + (newLen - prevLen), selStart + (newLen - prevLen));
 }
 function saldo(rem) { return Math.max(0, rem.total - rem.abonado); }
 function diasDesde(fechaStr) {
@@ -1354,7 +1362,7 @@ function abrirCliente(nombreCliente) {
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;margin-bottom:0.75rem">
       <div>
         <label style="font-size:0.75rem;color:var(--text2);display:block;margin-bottom:4px">Monto del abono</label>
-        <input class="fc" type="text" id="cl-abono-val" placeholder="$0" style="font-size:1.1rem;font-weight:700;color:var(--verde)" oninput="fmtInput(this)" inputmode="numeric">
+        <input class="fc" type="text" id="cl-abono-val" placeholder="$0" style="font-size:1.1rem;font-weight:700;color:var(--verde)" oninput="fmtInput(this)" onkeyup="fmtInput(this)" inputmode="numeric">
       </div>
       <div>
         <label style="font-size:0.75rem;color:var(--text2);display:block;margin-bottom:4px">Aplicar a</label>
