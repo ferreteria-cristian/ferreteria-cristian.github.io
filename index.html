@@ -1153,6 +1153,10 @@ function setConn(s) {
 // HELPERS
 // ============================================================
 function fmt(n) { return '$' + Math.round(n||0).toLocaleString('es-CO'); }
+function fmtInput(el) {
+  const raw = el.value.replace(/\D/g,'');
+  el.value = raw ? parseInt(raw,10).toLocaleString('es-CO') : '';
+}
 function saldo(rem) { return Math.max(0, rem.total - rem.abonado); }
 function diasDesde(fechaStr) {
   if (!fechaStr) return 0;
@@ -1350,7 +1354,7 @@ function abrirCliente(nombreCliente) {
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;margin-bottom:0.75rem">
       <div>
         <label style="font-size:0.75rem;color:var(--text2);display:block;margin-bottom:4px">Monto del abono</label>
-        <input class="fc" type="number" id="cl-abono-val" placeholder="$0" style="font-size:1rem;font-weight:700">
+        <input class="fc" type="text" id="cl-abono-val" placeholder="$0" style="font-size:1.1rem;font-weight:700;color:var(--verde)" oninput="fmtInput(this)" inputmode="numeric">
       </div>
       <div>
         <label style="font-size:0.75rem;color:var(--text2);display:block;margin-bottom:4px">Aplicar a</label>
@@ -1447,7 +1451,7 @@ function abrirEditarDesdeCliente(remId) {
 let clResultadoActual = '';
 
 async function guardarAbonoCliente(nombreCliente) {
-  const valor = parseFloat(document.getElementById('cl-abono-val')?.value) || 0;
+  const valor = parseFloat(document.getElementById('cl-abono-val')?.value.replace(/\./g,'').replace(',','.')) || 0;
   if (valor <= 0) { toast('Ingresa un monto válido', true); return; }
   const nota = document.getElementById('cl-abono-nota')?.value.trim() || '';
   const modo = document.getElementById('cl-abono-modo')?.value || 'mayor';
