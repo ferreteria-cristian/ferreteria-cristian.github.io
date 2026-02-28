@@ -798,6 +798,20 @@ label { font-size: 0.76rem; font-weight: 600; color: var(--text2); display: bloc
             <label>O ingresa el total directamente</label>
             <input class="fc" id="n-total-manual" type="number" placeholder="Si no detallas ítems, escribe el total aquí" oninput="document.getElementById('total-preview').textContent=fmt(this.value||0)">
           </div>
+          <div style="margin-top:0.75rem;background:var(--verde-bg);border:1px solid #a7f3d0;border-radius:10px;padding:0.85rem 1rem">
+            <label style="color:var(--verde);font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em">💰 Abono inicial (opcional)</label>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.65rem;margin-top:0.5rem">
+              <div>
+                <label style="color:var(--verde);font-size:0.72rem">Monto abonado</label>
+                <input class="fc" id="n-abono-inicial" type="number" placeholder="0 si no hay abono" style="color:var(--verde);font-weight:600">
+              </div>
+              <div>
+                <label style="color:var(--verde);font-size:0.72rem">Nota del abono</label>
+                <input class="fc" id="n-abono-nota" type="text" placeholder="Efectivo, transferencia...">
+              </div>
+            </div>
+            <div style="font-size:0.72rem;color:#2d6a4f;margin-top:0.4rem">Si el abono cubre el total, la remisión se marcará como pagada automáticamente.</div>
+          </div>
         </div>
 
         <div style="display:flex;gap:0.75rem;margin-top:1.25rem">
@@ -2102,6 +2116,28 @@ async function guardarRemision() {
 
   const newRem = { id, fecha, cliente:cliente.toUpperCase(), cel, doc, num, total, abonado:0, estado, _row: remisiones.length+2 };
   remisiones.push(newRem);
+
+  // Procesar abono inicial si existe
+  const abonoInicial = parseFloat(document.getElementById('n-abono-inicial').value) || 0;
+  const abonoNota = document.getElementById('n-abono-nota').value.trim();
+  if (abonoInicial > 0) {
+    const abonoId = genId();
+    await apiAppend('Abonos', [abonoId, fecha, id, abonoInicial, abonoNota]);
+    abonos.push({ id: abonoId, fecha, remId: id, valor: abonoInicial, nota: abonoNota });
+    newRem.abonado = abonoInicial;
+    const nuevoEstado = abonoInicial >= total ? 'cancelada' : estado;
+    if (nuevoEstado !== estado) {
+      newRem.estado = nuevoEstado;
+      await fetch(`${API}?action=updateById&sheet=Remisiones&id=${id}&values=${encodeURIComponent(JSON.stringify([
+        id, fecha, cliente.toUpperCase(), cel, doc, num, total, abonoInicial, nuevoEstado
+      ]))}`);
+    } else {
+      await fetch(`${API}?action=updateById&sheet=Remisiones&id=${id}&values=${encodeURIComponent(JSON.stringify([
+        id, fecha, cliente.toUpperCase(), cel, doc, num, total, abonoInicial, estado
+      ]))}`);
+    }
+  }
+
   updateClientesList();
   updateSidebar();
   toast(`Remisión guardada: ${fmt(total)} ✓`);
@@ -2158,7 +2194,7 @@ function mostrarBannerOtraRemision(cliente, totalUltimo) {
 
 function limpiarNueva() {
   document.getElementById('banner-otra-rem')?.remove();
-  ['n-cliente','n-cel','n-doc','n-num','n-nota','n-total-manual'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=''});
+  ['n-cliente','n-cel','n-doc','n-num','n-nota','n-total-manual','n-abono-inicial','n-abono-nota'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=''});
   document.getElementById('n-fecha').value = new Date().toISOString().slice(0,10);
   document.getElementById('n-plazo').value = '30';
   document.getElementById('items-container').innerHTML = `<div class="item-row" id="irow-0"><div><label>Descripción</label><input class="fc" id="idesc-0" placeholder="Ej: Hojas Drywall"></div><div><label>Cant.</label><input class="fc" id="iqty-0" type="number" placeholder="1" value="1" oninput="calcTotal()"></div><div><label>Valor unit.</label><input class="fc" id="iprice-0" type="number" placeholder="0" value="" oninput="calcTotal()"></div><div style="padding-top:20px"><button class="btn-icon" onclick="remItem(0)">🗑</button></div></div>`;
