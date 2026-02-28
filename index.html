@@ -2103,13 +2103,61 @@ async function guardarRemision() {
   const newRem = { id, fecha, cliente:cliente.toUpperCase(), cel, doc, num, total, abonado:0, estado, _row: remisiones.length+2 };
   remisiones.push(newRem);
   updateClientesList();
-  limpiarNueva();
   updateSidebar();
   toast(`Remisión guardada: ${fmt(total)} ✓`);
-  go('activas');
+
+  // Limpiar solo los campos variables, mantener cliente/cel/doc
+  const clienteGuardado = cliente.toUpperCase();
+  const celGuardado = cel;
+  const docGuardado = doc;
+  limpiarNueva();
+
+  // Restaurar datos del cliente y mostrar banner
+  document.getElementById('n-cliente').value = clienteGuardado;
+  document.getElementById('n-cel').value = celGuardado;
+  document.getElementById('n-doc').value = docGuardado;
+  mostrarBannerOtraRemision(clienteGuardado, total);
+}
+
+function mostrarBannerOtraRemision(cliente, totalUltimo) {
+  // Eliminar banner previo si existe
+  document.getElementById('banner-otra-rem')?.remove();
+
+  const banner = document.createElement('div');
+  banner.id = 'banner-otra-rem';
+  banner.style.cssText = `
+    background: #d8f3dc; border: 1px solid #a7f3d0; border-radius: 12px;
+    padding: 1rem 1.25rem; margin-bottom: 1.25rem;
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 1rem; flex-wrap: wrap;
+    animation: fadeIn 0.25s ease;
+  `;
+  banner.innerHTML = `
+    <div>
+      <div style="font-weight:700;color:var(--verde);font-size:0.95rem">✅ Remisión de ${fmt(totalUltimo)} guardada</div>
+      <div style="font-size:0.78rem;color:#2d6a4f;margin-top:2px">Cliente: <strong>${cliente}</strong> — datos pre-llenados</div>
+    </div>
+    <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
+      <button onclick="document.getElementById('banner-otra-rem').remove();document.getElementById('n-num').focus()"
+        style="background:var(--verde);color:white;border:none;border-radius:8px;padding:0.5rem 1rem;font-family:inherit;font-size:0.84rem;font-weight:600;cursor:pointer">
+        ➕ Otra remisión
+      </button>
+      <button onclick="document.getElementById('banner-otra-rem').remove();limpiarNueva();go('activas')"
+        style="background:none;color:var(--verde);border:1px solid var(--verde);border-radius:8px;padding:0.5rem 1rem;font-family:inherit;font-size:0.84rem;cursor:pointer">
+        ✓ Listo, ir a cartera
+      </button>
+    </div>
+  `;
+
+  // Insertar antes del nform
+  const nform = document.querySelector('#view-nueva .nform');
+  nform.parentNode.insertBefore(banner, nform);
+  // Scroll arriba
+  document.querySelector('.main').scrollTop = 0;
 }
 
 function limpiarNueva() {
+  document.getElementById('banner-otra-rem')?.remove();
   ['n-cliente','n-cel','n-doc','n-num','n-nota','n-total-manual'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=''});
   document.getElementById('n-fecha').value = new Date().toISOString().slice(0,10);
   document.getElementById('n-plazo').value = '30';
