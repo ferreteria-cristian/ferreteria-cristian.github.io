@@ -659,7 +659,7 @@ label { font-size: 0.76rem; font-weight: 600; color: var(--text2); display: bloc
         <div class="fgrid">
           <div>
             <label>Cliente *</label>
-            <input class="fc" id="n-cliente" type="text" placeholder="Nombre completo" list="clientes-list">
+            <input class="fc" id="n-cliente" type="text" placeholder="Nombre completo" list="clientes-list" oninput="autoFillCliente(this.value)" onchange="autoFillCliente(this.value)">
             <datalist id="clientes-list"></datalist>
           </div>
           <div>
@@ -700,8 +700,8 @@ label { font-size: 0.76rem; font-weight: 600; color: var(--text2); display: bloc
           <div id="items-container">
             <div class="item-row" id="irow-0">
               <div><label>Descripción</label><input class="fc" id="idesc-0" placeholder="Ej: Hojas Drywall"></div>
-              <div><label>Cant.</label><input class="fc" id="iqty-0" type="number" placeholder="1" oninput="calcTotal()"></div>
-              <div><label>Valor unit.</label><input class="fc" id="iprice-0" type="number" placeholder="0" oninput="calcTotal()"></div>
+              <div><label>Cant.</label><input class="fc" id="iqty-0" type="number" placeholder="1" value="1" oninput="calcTotal()"></div>
+              <div><label>Valor unit.</label><input class="fc" id="iprice-0" type="number" placeholder="0" value="" oninput="calcTotal()"></div>
               <div style="padding-top:20px"><button class="btn-icon" onclick="remItem(0)">🗑</button></div>
             </div>
           </div>
@@ -1416,7 +1416,7 @@ function abrirCliente(nombreCliente) {
     </div>`;
   }).join('') + `
   <div style="padding-top:0.5rem;border-top:1px solid var(--border);margin-top:0.5rem">
-    <button class="btn-primary" style="width:100%" onclick="closeCl();go('nueva')">➕ Nueva remisión para este cliente</button>
+    <button class="btn-primary" style="width:100%" onclick="nuevaRemisionParaCliente('${nombreCliente.replace(/'/g,"\\'")}')">➕ Nueva remisión para este cliente</button>
   </div>`;
 
   document.getElementById('cl-overlay').classList.add('open');
@@ -1684,7 +1684,7 @@ function addItem() {
   const idx = iCount++;
   const d = document.createElement('div');
   d.className='item-row'; d.id='irow-'+idx;
-  d.innerHTML = `<div><label>Descripción</label><input class="fc" id="idesc-${idx}" placeholder="Producto"></div><div><label>Cant.</label><input class="fc" id="iqty-${idx}" type="number" placeholder="1" oninput="calcTotal()"></div><div><label>Valor unit.</label><input class="fc" id="iprice-${idx}" type="number" placeholder="0" oninput="calcTotal()"></div><div style="padding-top:20px"><button class="btn-icon" onclick="remItem(${idx})">🗑</button></div>`;
+  d.innerHTML = `<div><label>Descripción</label><input class="fc" id="idesc-${idx}" placeholder="Producto"></div><div><label>Cant.</label><input class="fc" id="iqty-${idx}" type="number" placeholder="1" value="1" oninput="calcTotal()"></div><div><label>Valor unit.</label><input class="fc" id="iprice-${idx}" type="number" placeholder="0" value="" oninput="calcTotal()"></div><div style="padding-top:20px"><button class="btn-icon" onclick="remItem(${idx})">🗑</button></div>`;
   c.appendChild(d);
 }
 function remItem(idx) { const el=document.getElementById('irow-'+idx); if(el) el.remove(); calcTotal(); }
@@ -1744,7 +1744,7 @@ function limpiarNueva() {
   ['n-cliente','n-cel','n-doc','n-num','n-nota','n-total-manual'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=''});
   document.getElementById('n-fecha').value = new Date().toISOString().slice(0,10);
   document.getElementById('n-plazo').value = '30';
-  document.getElementById('items-container').innerHTML = `<div class="item-row" id="irow-0"><div><label>Descripción</label><input class="fc" id="idesc-0" placeholder="Ej: Hojas Drywall"></div><div><label>Cant.</label><input class="fc" id="iqty-0" type="number" placeholder="1" oninput="calcTotal()"></div><div><label>Valor unit.</label><input class="fc" id="iprice-0" type="number" placeholder="0" oninput="calcTotal()"></div><div style="padding-top:20px"><button class="btn-icon" onclick="remItem(0)">🗑</button></div></div>`;
+  document.getElementById('items-container').innerHTML = `<div class="item-row" id="irow-0"><div><label>Descripción</label><input class="fc" id="idesc-0" placeholder="Ej: Hojas Drywall"></div><div><label>Cant.</label><input class="fc" id="iqty-0" type="number" placeholder="1" value="1" oninput="calcTotal()"></div><div><label>Valor unit.</label><input class="fc" id="iprice-0" type="number" placeholder="0" value="" oninput="calcTotal()"></div><div style="padding-top:20px"><button class="btn-icon" onclick="remItem(0)">🗑</button></div></div>`;
   iCount = 1;
   document.getElementById('total-preview').textContent = '$0';
 }
@@ -1752,6 +1752,29 @@ function limpiarNueva() {
 function updateClientesList() {
   const names = [...new Set(remisiones.map(r=>r.cliente))].sort();
   document.getElementById('clientes-list').innerHTML = names.map(n=>`<option value="${n}">`).join('');
+}
+
+function nuevaRemisionParaCliente(nombreCliente) {
+  closeCl();
+  go('nueva');
+  const rem = remisiones.filter(r => r.cliente === nombreCliente).slice(-1)[0];
+  if (!rem) return;
+  const clienteEl = document.getElementById('n-cliente');
+  const celEl = document.getElementById('n-cel');
+  const docEl = document.getElementById('n-doc');
+  if (clienteEl) clienteEl.value = rem.cliente;
+  if (celEl) celEl.value = rem.cel || '';
+  if (docEl) docEl.value = rem.doc || '';
+}
+
+function autoFillCliente(nombre) {
+  const nombreUp = nombre.trim().toUpperCase();
+  const rem = remisiones.filter(r => r.cliente === nombreUp).slice(-1)[0];
+  if (!rem) return;
+  const celEl = document.getElementById('n-cel');
+  const docEl = document.getElementById('n-doc');
+  if (celEl) celEl.value = rem.cel || '';
+  if (docEl) docEl.value = rem.doc || '';
 }
 
 // ============================================================
