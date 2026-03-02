@@ -161,8 +161,8 @@ label { font-size: 0.76rem; font-weight: 600; color: var(--text2); display: bloc
 .rbtn.sel-nocontesta { border-color: #6b7280; background: #6b7280; color: white; }
 .rbtn.sel-negado { border-color: var(--rojo); background: var(--rojo); color: white; }
 .rbtn.sel-other { border-color: #374151; background: #374151; color: white; }
-.extra { animation: fadeIn 0.2s; }
-@keyframes fadeIn { from { opacity:0; transform:translateY(-4px); } to { opacity:1; transform:translateY(0); } }
+.extra { animation: fadeIn 0.15s; }
+@keyframes fadeIn { from { opacity:0; transform:translateY(-3px); } to { opacity:1; transform:translateY(0); } }
 .modal-actions { display: flex; gap: 0.65rem; justify-content: flex-end; padding-top: 0.5rem; border-top: 1px solid var(--border); }
 .btn-primary { background: var(--accent); color: white; border: none; border-radius: 8px; padding: 0.65rem 1.4rem; font-family: inherit; font-size: 0.86rem; font-weight: 600; cursor: pointer; }
 .btn-primary:hover { background: var(--accent2); }
@@ -197,6 +197,14 @@ label { font-size: 0.76rem; font-weight: 600; color: var(--text2); display: bloc
 @keyframes spin { to { transform: rotate(360deg); } }
 .empty { text-align: center; padding: 3rem; color: var(--text3); }
 .empty-icon { font-size: 2.2rem; margin-bottom: 0.5rem; }
+
+/* MOBILE PERFORMANCE */
+.cobro-card, .cliente-card { will-change: transform; }
+.cobro-actions { transition: none; }
+.nav-item, .mob-nav-item { transition: background 0.1s; }
+.cliente-card { transition: border-color 0.1s; }
+* { -webkit-tap-highlight-color: transparent; }
+input, select, textarea { -webkit-appearance: none; border-radius: 8px; }
 
 /* TOAST */
 .toast { position: fixed; bottom: 5rem; right: 1rem; background: var(--text); color: white; padding: 0.75rem 1.1rem; border-radius: 10px; font-size: 0.84rem; z-index: 999; transform: translateY(80px); opacity: 0; transition: all 0.3s; border-left: 4px solid var(--verde); max-width: 320px; }
@@ -708,7 +716,7 @@ label { font-size: 0.76rem; font-weight: 600; color: var(--text2); display: bloc
         <div class="page-sub">Clientes con saldo pendiente</div>
       </div>
       <div class="filters">
-        <input class="search" type="text" placeholder="🔍 Buscar cliente, cédula o # remisión..." id="search-activas" oninput="renderActivas()">
+        <input class="search" type="text" placeholder="🔍 Buscar cliente, cédula o # remisión..." id="search-activas" oninput="renderActivasDebounced()">
         <button class="fbtn active" onclick="setF('todas',this)" id="f-todas">Todas</button>
         <button class="fbtn" onclick="setF('rojo',this)">🔴 +60 días</button>
         <button class="fbtn" onclick="setF('amarillo',this)">🟡 30–60 días</button>
@@ -775,7 +783,7 @@ label { font-size: 0.76rem; font-weight: 600; color: var(--text2); display: bloc
           </div>
           <div class="full">
             <label>Nota inicial</label>
-            <input class="fc" id="n-nota" type="text" placeholder="Observaciones, acuerdos iniciales...">
+            <input class="fc" enterkeyhint="done" id="n-nota" type="text" placeholder="Observaciones, acuerdos iniciales...">
           </div>
         </div>
 
@@ -796,14 +804,14 @@ label { font-size: 0.76rem; font-weight: 600; color: var(--text2); display: bloc
           </div>
           <div style="margin-top:0.5rem">
             <label>O ingresa el total directamente</label>
-            <input class="fc" id="n-total-manual" type="number" placeholder="Si no detallas ítems, escribe el total aquí" oninput="document.getElementById('total-preview').textContent=fmt(this.value||0)">
+            <input class="fc" id="n-total-manual" type="number" inputmode="numeric" enterkeyhint="done" placeholder="Si no detallas ítems, escribe el total aquí" oninput="document.getElementById('total-preview').textContent=fmt(this.value||0)">
           </div>
           <div style="margin-top:0.75rem;background:var(--verde-bg);border:1px solid #a7f3d0;border-radius:10px;padding:0.85rem 1rem">
             <label style="color:var(--verde);font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em">💰 Abono inicial (opcional)</label>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.65rem;margin-top:0.5rem">
               <div>
                 <label style="color:var(--verde);font-size:0.72rem">Monto abonado</label>
-                <input class="fc" id="n-abono-inicial" type="number" placeholder="0 si no hay abono" style="color:var(--verde);font-weight:600">
+                <input class="fc" id="n-abono-inicial" type="number" inputmode="numeric" enterkeyhint="done" placeholder="0 si no hay abono" style="color:var(--verde);font-weight:600">
               </div>
               <div>
                 <label style="color:var(--verde);font-size:0.72rem">Nota del abono</label>
@@ -994,7 +1002,7 @@ label { font-size: 0.76rem; font-weight: 600; color: var(--text2); display: bloc
         <div class="frow">
           <div>
             <label>Valor abonado ($)</label>
-            <input class="fc" id="ab-valor" type="number" placeholder="0">
+            <input class="fc" id="ab-valor" type="number" inputmode="numeric" enterkeyhint="done" placeholder="0">
           </div>
           <div>
             <label>Nota</label>
@@ -1603,6 +1611,7 @@ async function guardarAbonoCliente(nombreCliente) {
   else if (modo === 'menor') rems.sort((a,b) => diasDesde(a.fecha)-diasDesde(b.fecha)); // más reciente primero
   else if (modo === 'unica' && rems.length !== 1) { toast('Este modo solo aplica si hay una remisión activa', true); return; }
 
+  dismissKeyboard();
   toast('Guardando abono...');
   let restante = valor;
   try {
@@ -1658,6 +1667,7 @@ async function guardarGestionCliente(nombreCliente) {
     r.estado !== 'cancelada' && r.estado !== 'eliminada' && saldo(r) > 0
   );
 
+  dismissKeyboard();
   toast('Guardando...');
   try {
     for (const r of rems) {
@@ -1757,7 +1767,7 @@ function renderCobro() {
           <button class="cobro-rbtn" style="border-color:var(--verde);color:var(--verde)" onclick="toggleAbonoRapido('${clienteId}',this)">💰 Recibió pago</button>
         </div>
         <div class="cobro-nota-row">
-          <input class="fc" type="text" id="cnota-${clienteId}" placeholder="Nota rápida (opcional)...">
+          <input class="fc" type="text" enterkeyhint="send" id="cnota-${clienteId}" placeholder="Nota rápida (opcional)...">
           <button class="cobro-guardar" onclick="guardarCobroGestion('${g.cliente}','${clienteId}')">Guardar gestión</button>
         </div>
       </div>
@@ -1824,6 +1834,7 @@ async function guardarAbonoRapido(nombreCliente, clienteId) {
 
   if (!rems.length) { toast('Sin remisiones activas para este cliente', true); return; }
 
+  dismissKeyboard();
   toast('Guardando pago...');
   try {
     // 1. Guardar abono(s) distribuyendo de más antigua a más reciente
@@ -1844,12 +1855,12 @@ async function guardarAbonoRapido(nombreCliente, clienteId) {
       r.estado = nuevoEstado;
     }
 
-    // 2. Guardar gestión "pago_recibido" para cada remisión
-    for (const r of rems) {
+    // 2. Guardar gestiones en paralelo
+    await Promise.all(rems.map(r => {
       const id = genId();
-      await apiAppend('Gestiones', [id, fecha, r.id, 'pago_recibido', `Pago ${fmt(valor)}${nota?' · '+nota:''}`]);
       gestiones.push({ id, fecha, remId: r.id, resultado: 'pago_recibido', nota });
-    }
+      return apiAppend('Gestiones', [id, fecha, r.id, 'pago_recibido', `Pago ${fmt(valor)}${nota?' · '+nota:''}`]);
+    }));
 
     // 3. Marcar como gestionado
     cobroGestionadosHoy.add(nombreCliente);
@@ -1897,13 +1908,14 @@ async function guardarCobroGestion(nombreCliente, clienteId) {
     r.estado !== 'cancelada' && r.estado !== 'eliminada' && saldo(r) > 0
   );
 
+  dismissKeyboard();
   toast('Guardando...');
   try {
-    for (const r of rems) {
+    await Promise.all(rems.map(r => {
       const id = genId();
-      await apiAppend('Gestiones', [id, fecha, r.id, resultado, nota]);
       gestiones.push({ id, fecha, remId: r.id, resultado, nota });
-    }
+      return apiAppend('Gestiones', [id, fecha, r.id, resultado, nota]);
+    }));
     cobroGestionadosHoy.add(nombreCliente);
     delete cobroResultados[clienteId];
     toast(`Gestión guardada ✓`);
@@ -2006,6 +2018,7 @@ async function guardarAbono() {
   const id = genId();
 
   toast('Guardando abono...');
+  dismissKeyboard();
   const row = [id, fecha, remActiva.id, valor, nota];
   const res = await apiAppend('Abonos', row);
   if (!res.ok) { toast('Error guardando abono',true); return; }
@@ -2048,6 +2061,7 @@ async function guardarGestion() {
     if (fp) notaCompleta = `Promesa para ${fp}${mp?' por '+fmt(mp):''}${nota?' - '+nota:''}`;
   }
 
+  dismissKeyboard();
   toast('Guardando gestión...');
   const row = [id, fecha, remActiva.id, resultadoSel, notaCompleta];
   const res = await apiAppend('Gestiones', row);
@@ -2103,6 +2117,7 @@ async function guardarRemision() {
   const num = document.getElementById('n-num').value.trim();
   const estado = document.getElementById('n-estado').value;
   const nota = document.getElementById('n-nota').value.trim();
+  dismissKeyboard();
 
   toast('Guardando...');
   const row = [id, fecha, cliente.toUpperCase(), cel, doc, num, total, 0, estado];
@@ -2477,6 +2492,24 @@ function renderReportes() {
       <td data-label="Total" class="td-mono">${fmt(r.total)}</td>
       <td data-label="Estado"><span class="badge rojo">Eliminada</span></td>
     </tr>`).join('');
+  }
+}
+
+// ============================================================
+// DEBOUNCE (OPT 5)
+// ============================================================
+function debounce(fn, ms) {
+  let timer;
+  return (...args) => { clearTimeout(timer); timer = setTimeout(() => fn(...args), ms); };
+}
+const renderActivasDebounced = debounce(renderActivas, 220);
+
+// ============================================================
+// KEYBOARD DISMISS (OPT 3)
+// ============================================================
+function dismissKeyboard() {
+  if (document.activeElement && document.activeElement.blur) {
+    document.activeElement.blur();
   }
 }
 
