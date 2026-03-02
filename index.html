@@ -963,7 +963,25 @@ input, select, textarea { -webkit-appearance: none; border-radius: 8px; }
           <div class="cl-saldo-lbl">Deuda total</div>
           <div class="cl-saldo-val" id="cl-saldo">$0</div>
         </div>
+        <button class="btn-secondary" style="padding:0.4rem 0.75rem;font-size:0.8rem" onclick="abrirEditarCliente(document.getElementById('cl-nombre').textContent)">✏️</button>
         <button class="btn-close" onclick="closeCl()">✕</button>
+      </div>
+    </div>
+    <!-- Notas del cliente -->
+    <div id="cl-notas-banner" style="display:none;background:#fef9c3;border:1px solid #fde047;border-radius:8px;padding:0.6rem 1rem;margin:0.5rem 1rem 0;font-size:0.85rem;color:#713f12"></div>
+    <!-- Panel editar cliente -->
+    <div id="cl-edit-panel" style="display:none;margin:0.75rem 1rem 0;background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:1rem">
+      <div class="sec-title" style="margin-bottom:0.75rem">✏️ Editar datos del cliente</div>
+      <input type="hidden" id="cl-edit-id">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;margin-bottom:0.5rem">
+        <div><label style="font-size:0.75rem;color:var(--text2)">Nombre</label><input class="fc" id="cl-edit-nombre" type="text" placeholder="Nombre completo"></div>
+        <div><label style="font-size:0.75rem;color:var(--text2)">Cédula / NIT</label><input class="fc" id="cl-edit-doc" type="text" inputmode="numeric" placeholder="Documento"></div>
+      </div>
+      <div style="margin-bottom:0.5rem"><label style="font-size:0.75rem;color:var(--text2)">Celular</label><input class="fc" id="cl-edit-cel" type="tel" inputmode="numeric" placeholder="Celular"></div>
+      <div style="margin-bottom:0.75rem"><label style="font-size:0.75rem;color:var(--text2)">Observaciones / Notas</label><textarea class="fc" id="cl-edit-notas" rows="2" placeholder="Notas internas del cliente..." style="resize:none"></textarea></div>
+      <div style="display:flex;gap:0.5rem">
+        <button class="btn-primary" style="flex:1" onclick="guardarEditarCliente()">💾 Guardar</button>
+        <button class="btn-secondary" onclick="document.getElementById('cl-edit-panel').style.display='none'">Cancelar</button>
       </div>
     </div>
     <div class="cl-body" id="cl-body"></div>
@@ -1123,6 +1141,7 @@ const API = 'https://script.google.com/macros/s/AKfycbywbgkjm3VO4s47BXA1JJLfzMzM
 let remisiones = [];
 let abonos = [];
 let gestiones = [];
+let clientes = []; // hoja Clientes
 let remActiva = null;
 let resultadoSel = null;
 let filtroColor = 'todas';
@@ -1233,10 +1252,11 @@ async function apiUpdate(sheet, rowNum, values) {
 async function loadAll() {
   setConn('loading');
   try {
-    const [rRows, aRows, gRows] = await Promise.all([
+    const [rRows, aRows, gRows, cRows] = await Promise.all([
       apiGet('Remisiones'),
       apiGet('Abonos'),
-      apiGet('Gestiones')
+      apiGet('Gestiones'),
+      apiGet('Clientes')
     ]);
 
     // Parse remisiones (skip header row 0)
@@ -1255,6 +1275,11 @@ async function loadAll() {
 
     gestiones = gRows.slice(1).filter(r=>r[0]).map(r => ({
       id: r[0], fecha: r[1], remId: r[2], resultado: r[3], nota: r[4]
+    }));
+
+    // Parse clientes: id, nombre, doc, cel, notas
+    clientes = (cRows||[]).slice(1).filter(r=>r[0]).map(r => ({
+      id: String(r[0]), nombre: String(r[1]||''), doc: String(r[2]||''), cel: String(r[3]||''), notas: String(r[4]||'')
     }));
 
     // Recalculate abonados from abonos table
@@ -1489,6 +1514,8 @@ function abrirCliente(nombreCliente) {
   document.getElementById('cl-nombre').textContent = nombreCliente;
   document.getElementById('cl-info').textContent = `${cel||'Sin celular'}${doc?' · '+doc:''}`;
   document.getElementById('cl-saldo').textContent = fmt(totalSaldo);
+  document.getElementById('cl-edit-panel').style.display = 'none';
+  renderNotasCliente(nombreCliente);
 
   const body = document.getElementById('cl-body');
 
@@ -2503,6 +2530,95 @@ function debounce(fn, ms) {
   return (...args) => { clearTimeout(timer); timer = setTimeout(() => fn(...args), ms); };
 }
 const renderActivasDebounced = debounce(renderActivas, 220);
+
+
+// ============================================================
+// CLIENTES CRUD
+// ============================================================
+function getCliente(nombreCliente) {
+  return clientes.find(c => c.nombre.toUpperCase() === nombreCliente.toUpperCase()) || null;
+}
+
+async function ensureCliente(nombreCliente, doc, cel) {
+  let c = getCliente(nombreCliente);
+  if (!c) {
+    const id = genId();
+    const row = [id, nombreCliente.toUpperCase(), doc||'', cel||'', ''];
+    await apiAppend('Clientes', row);
+    c = { id, nombre: nombreCliente.toUpperCase(), doc: doc||'', cel: cel||'', notas: '' };
+    clientes.push(c);
+  }
+  return c;
+}
+
+async function guardarEditarCliente() {
+  const id = document.getElementById('cl-edit-id').value;
+  const nombre = document.getElementById('cl-edit-nombre').value.trim().toUpperCase();
+  const doc = document.getElementById('cl-edit-doc').value.trim();
+  const cel = document.getElementById('cl-edit-cel').value.trim();
+  const notas = document.getElementById('cl-edit-notas').value.trim();
+
+  if (!nombre) { toast('El nombre no puede estar vacío', true); return; }
+
+  dismissKeyboard();
+  toast('Guardando...');
+  try {
+    const row = [id, nombre, doc, cel, notas];
+    const existing = clientes.find(c => c.id === id);
+    if (existing) {
+      await apiCall('updateById', 'Clientes', id, row);
+      existing.nombre = nombre; existing.doc = doc; existing.cel = cel; existing.notas = notas;
+    } else {
+      await apiAppend('Clientes', row);
+      clientes.push({ id, nombre, doc, cel, notas });
+    }
+    toast('Cliente actualizado ✓');
+    // Update header display
+    document.getElementById('cl-nombre').textContent = nombre;
+    document.getElementById('cl-info').textContent = `${cel||'Sin celular'}${doc?' · '+doc:''}`;
+    // Update notas banner
+    renderNotasCliente(nombre);
+    // Close edit panel
+    const panel = document.getElementById('cl-edit-panel');
+    if (panel) panel.style.display = 'none';
+  } catch(e) {
+    toast('Error guardando', true);
+  }
+}
+
+async function apiCall(action, sheet, id, values) {
+  const url = `${API}?action=${action}&sheet=${sheet}&id=${encodeURIComponent(id)}&values=${encodeURIComponent(JSON.stringify(values))}`;
+  const res = await fetch(url);
+  return res.json();
+}
+
+function renderNotasCliente(nombreCliente) {
+  const c = getCliente(nombreCliente);
+  const banner = document.getElementById('cl-notas-banner');
+  if (!banner) return;
+  if (c && c.notas) {
+    banner.style.display = 'block';
+    banner.textContent = '📝 ' + c.notas;
+  } else {
+    banner.style.display = 'none';
+  }
+}
+
+function abrirEditarCliente(nombreCliente) {
+  const c = getCliente(nombreCliente) || { id: genId(), nombre: nombreCliente, doc: '', cel: '', notas: '' };
+  const rems = remisiones.filter(r => r.cliente === nombreCliente && r.estado !== 'eliminada');
+  const cel = c.cel || (rems[0]?.cel||'');
+  const doc = c.doc || (rems[0]?.doc||'');
+
+  document.getElementById('cl-edit-id').value = c.id;
+  document.getElementById('cl-edit-nombre').value = c.nombre;
+  document.getElementById('cl-edit-doc').value = doc;
+  document.getElementById('cl-edit-cel').value = cel;
+  document.getElementById('cl-edit-notas').value = c.notas;
+
+  const panel = document.getElementById('cl-edit-panel');
+  panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+}
 
 // ============================================================
 // KEYBOARD DISMISS (OPT 3)
