@@ -2629,6 +2629,17 @@ function dismissKeyboard() {
   }
 }
 
+// Dismiss keyboard when tapping outside inputs on mobile
+document.addEventListener('touchstart', function(e) {
+  const tag = e.target.tagName;
+  if (tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT') {
+    if (document.activeElement && (document.activeElement.tagName === 'INPUT' ||
+        document.activeElement.tagName === 'TEXTAREA' || document.activeElement.tagName === 'SELECT')) {
+      document.activeElement.blur();
+    }
+  }
+}, { passive: true });
+
 // ============================================================
 // TOAST
 // ============================================================
