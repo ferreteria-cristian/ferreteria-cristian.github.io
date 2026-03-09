@@ -1020,7 +1020,10 @@ input, select, textarea { -webkit-appearance: none; border-radius: 8px; }
         <div class="frow">
           <div>
             <label>Valor abonado ($)</label>
-            <input class="fc" id="ab-valor" type="number" inputmode="numeric" enterkeyhint="done" placeholder="0">
+            <div style="display:flex;gap:0.5rem;align-items:center">
+              <input class="fc" id="ab-valor" type="number" inputmode="numeric" enterkeyhint="done" placeholder="0" style="flex:1">
+              <button class="btn-secondary" style="white-space:nowrap;padding:0.5rem 0.75rem;font-size:0.8rem" onclick="document.getElementById('ab-valor').value=saldo(remActiva);fmtInput&&fmtInput(document.getElementById('ab-valor'))">Pagar todo</button>
+            </div>
           </div>
           <div>
             <label>Nota</label>
@@ -1526,7 +1529,10 @@ function abrirCliente(nombreCliente) {
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;margin-bottom:0.75rem">
       <div>
         <label style="font-size:0.75rem;color:var(--text2);display:block;margin-bottom:4px">Monto del abono</label>
-        <input class="fc" type="text" id="cl-abono-val" placeholder="$0" style="font-size:1.1rem;font-weight:700;color:var(--verde)" oninput="fmtInput(this)" onkeyup="fmtInput(this)" inputmode="numeric">
+        <div style="display:flex;gap:0.5rem;align-items:center">
+              <input class="fc" type="text" id="cl-abono-val" placeholder="$0" style="font-size:1.1rem;font-weight:700;color:var(--verde);flex:1" oninput="fmtInput(this)" onkeyup="fmtInput(this)" inputmode="numeric">
+              <button class="btn-secondary" style="white-space:nowrap;padding:0.5rem 0.75rem;font-size:0.8rem" onclick="pagarTodoCliente()">Pagar todo</button>
+            </div>
       </div>
       <div>
         <label style="font-size:0.75rem;color:var(--text2);display:block;margin-bottom:4px">Aplicar a</label>
@@ -2590,6 +2596,18 @@ async function apiCall(action, sheet, id, values) {
   const url = `${API}?action=${action}&sheet=${sheet}&id=${encodeURIComponent(id)}&values=${encodeURIComponent(JSON.stringify(values))}`;
   const res = await fetch(url);
   return res.json();
+}
+
+function pagarTodoCliente() {
+  const nombreCliente = document.getElementById('cl-nombre').textContent;
+  const rems = remisiones.filter(r =>
+    r.cliente === nombreCliente &&
+    r.estado !== 'cancelada' && r.estado !== 'eliminada' && saldo(r) > 0
+  );
+  const total = rems.reduce((s, r) => s + saldo(r), 0);
+  const input = document.getElementById('cl-abono-val');
+  input.value = total.toLocaleString('es-CO');
+  fmtInput(input);
 }
 
 function renderNotasCliente(nombreCliente) {
