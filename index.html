@@ -1022,7 +1022,7 @@ input, select, textarea { -webkit-appearance: none; border-radius: 8px; }
             <label>Valor abonado ($)</label>
             <div style="display:flex;gap:0.5rem;align-items:center">
               <input class="fc" id="ab-valor" type="number" inputmode="numeric" enterkeyhint="done" placeholder="0" style="flex:1">
-              <button class="btn-secondary" style="white-space:nowrap;padding:0.5rem 0.75rem;font-size:0.8rem" onclick="document.getElementById('ab-valor').value=saldo(remActiva);fmtInput&&fmtInput(document.getElementById('ab-valor'))">Pagar todo</button>
+              <button class="btn-secondary" id="btn-pagar-todo-rem" style="white-space:nowrap;padding:0.5rem 0.75rem;font-size:0.8rem" onclick="togglePagarTodoRem()">Pagar todo</button>
             </div>
           </div>
           <div>
@@ -1531,7 +1531,7 @@ function abrirCliente(nombreCliente) {
         <label style="font-size:0.75rem;color:var(--text2);display:block;margin-bottom:4px">Monto del abono</label>
         <div style="display:flex;gap:0.5rem;align-items:center">
               <input class="fc" type="text" id="cl-abono-val" placeholder="$0" style="font-size:1.1rem;font-weight:700;color:var(--verde);flex:1" oninput="fmtInput(this)" onkeyup="fmtInput(this)" inputmode="numeric">
-              <button class="btn-secondary" style="white-space:nowrap;padding:0.5rem 0.75rem;font-size:0.8rem" onclick="pagarTodoCliente()">Pagar todo</button>
+              <button class="btn-secondary" id="btn-pagar-todo-cl" style="white-space:nowrap;padding:0.5rem 0.75rem;font-size:0.8rem" onclick="togglePagarTodoCliente()">Pagar todo</button>
             </div>
       </div>
       <div>
@@ -2001,6 +2001,8 @@ function abrirRemision(id) {
   document.getElementById('g-nota').value='';
   document.getElementById('ab-valor').value='';
   document.getElementById('ab-nota').value='';
+  const btnPT = document.getElementById('btn-pagar-todo-rem');
+  if (btnPT) btnPT.textContent = 'Pagar todo';
   document.getElementById('g-fecha-p').value='';
   document.getElementById('g-monto-p').value='';
 
@@ -2596,6 +2598,56 @@ async function apiCall(action, sheet, id, values) {
   const url = `${API}?action=${action}&sheet=${sheet}&id=${encodeURIComponent(id)}&values=${encodeURIComponent(JSON.stringify(values))}`;
   const res = await fetch(url);
   return res.json();
+}
+
+function togglePagarTodoRem() {
+  const input = document.getElementById('ab-valor');
+  const btn = document.getElementById('btn-pagar-todo-rem');
+  const totalStr = String(Math.round(saldo(remActiva)));
+  const currentRaw = input.value.replace(/\./g,'').replace(',','.');
+  if (currentRaw === totalStr || input.value === '') {
+    if (currentRaw === totalStr) {
+      // Ya tiene el total → limpiar para escribir otro valor
+      input.value = '';
+      btn.textContent = 'Pagar todo';
+      input.focus();
+    } else {
+      // Vacío → llenar con total
+      input.value = saldo(remActiva);
+      fmtInput && fmtInput(input);
+      btn.textContent = 'Limpiar';
+    }
+  } else {
+    // Tiene otro valor → llenar con total
+    input.value = saldo(remActiva);
+    fmtInput && fmtInput(input);
+    btn.textContent = 'Limpiar';
+  }
+}
+
+function togglePagarTodoCliente() {
+  const nombreCliente = document.getElementById('cl-nombre').textContent;
+  const rems = remisiones.filter(r =>
+    r.cliente === nombreCliente &&
+    r.estado !== 'cancelada' && r.estado !== 'eliminada' && saldo(r) > 0
+  );
+  const total = rems.reduce((s, r) => s + saldo(r), 0);
+  const input = document.getElementById('cl-abono-val');
+  const btn = document.getElementById('btn-pagar-todo-cl');
+  const totalStr = String(Math.round(total));
+  const currentRaw = (input.value || '').replace(/\./g,'').replace(',','.');
+  if (currentRaw === totalStr) {
+    // Ya tiene el total → limpiar
+    input.value = '';
+    btn.textContent = 'Pagar todo';
+    input.focus();
+  } else {
+    // Poner el total
+    input.value = total.toLocaleString('es-CO');
+    fmtInput(input);
+    btn.textContent = 'Limpiar';
+    input.focus();
+  }
 }
 
 function pagarTodoCliente() {
