@@ -1272,7 +1272,7 @@ async function loadAll() {
       _row: rRows.indexOf(r) + 1
     }));
 
-    abonos = aRows.slice(1).filter(r=>r[0]).map(r => ({
+    abonos = aRows.slice(1).filter(r=>r[0] && r[4]!=='__ELIMINADO__').map(r => ({
       id: r[0], fecha: r[1], remId: r[2], valor: parseFloat(r[3])||0, nota: r[4]
     }));
 
@@ -1526,22 +1526,18 @@ function abrirCliente(nombreCliente) {
   const gestionGeneralHTML = `
   <div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:1rem;margin-bottom:0.25rem">
     <div class="sec-title" style="margin-bottom:0.75rem">💰 Registrar abono general</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;margin-bottom:0.75rem">
-      <div>
-        <label style="font-size:0.75rem;color:var(--text2);display:block;margin-bottom:4px">Monto del abono</label>
-        <div style="display:flex;gap:0.5rem;align-items:center">
-              <input class="fc" type="text" id="cl-abono-val" placeholder="$0" style="font-size:1.1rem;font-weight:700;color:var(--verde);flex:1" oninput="fmtInput(this)" onkeyup="fmtInput(this)" inputmode="numeric">
-              <button class="btn-secondary" id="btn-pagar-todo-cl" style="white-space:nowrap;padding:0.5rem 0.75rem;font-size:0.8rem" onclick="togglePagarTodoCliente()">Pagar todo</button>
-            </div>
-      </div>
-      <div>
-        <label style="font-size:0.75rem;color:var(--text2);display:block;margin-bottom:4px">Aplicar a</label>
-        <select class="fc" id="cl-abono-modo">
-          <option value="mayor">Remisión más antigua primero</option>
-          <option value="menor">Remisión más reciente primero</option>
-          <option value="unica">Solo si es una remisión</option>
-        </select>
-      </div>
+    <div style="margin-bottom:0.6rem">
+      <label style="font-size:0.75rem;color:var(--text2);display:block;margin-bottom:4px">Monto del abono</label>
+      <input class="fc" type="text" id="cl-abono-val" placeholder="$0" style="font-size:1.2rem;font-weight:700;color:var(--verde);width:100%" oninput="fmtInput(this)" onkeyup="fmtInput(this)" inputmode="numeric">
+      <button class="btn-secondary" id="btn-pagar-todo-cl" style="width:100%;margin-top:0.4rem;font-size:0.82rem;padding:0.5rem" onclick="togglePagarTodoCliente()">Pagar todo</button>
+    </div>
+    <div style="margin-bottom:0.6rem">
+      <label style="font-size:0.75rem;color:var(--text2);display:block;margin-bottom:4px">Aplicar a</label>
+      <select class="fc" id="cl-abono-modo">
+        <option value="mayor">Remisión más antigua primero</option>
+        <option value="menor">Remisión más reciente primero</option>
+        <option value="unica">Solo si es una remisión</option>
+      </select>
     </div>
     <input class="fc" type="text" id="cl-abono-nota" placeholder="Nota del abono..." style="margin-bottom:0.75rem">
     <button class="btn-primary" style="width:100%;background:var(--verde);border-color:var(--verde)" onclick="guardarAbonoCliente('${nombreCliente}')">💾 Guardar abono</button>
@@ -1571,7 +1567,7 @@ function abrirCliente(nombreCliente) {
     const gsRem = gestiones.filter(g=>String(g.remId)===String(r.id));
     const abonosRem = abonos.filter(a=>String(a.remId)===String(r.id));
     let notas = '';
-    abonosRem.forEach(a => notas += `<div style="font-size:0.8rem;color:var(--verde);padding:2px 0">✅ Abono ${fmt(a.valor)} — ${fmtFecha(a.fecha)}${a.nota?' ('+a.nota+')':''}</div>`);
+    abonosRem.forEach(a => notas += `<div style="font-size:0.8rem;color:var(--verde);padding:3px 0;display:flex;align-items:center;justify-content:space-between;gap:0.5rem"><span>✅ Abono ${fmt(a.valor)} — ${fmtFecha(a.fecha)}${a.nota?' ('+a.nota+')':''}</span>${isAdmin()?`<button onclick="eliminarAbono('${a.id}','${r.id}','${nombreCliente}')" style="background:none;border:none;color:var(--rojo);cursor:pointer;font-size:0.9rem;padding:2px 4px;flex-shrink:0" title="Eliminar abono">🗑</button>`:''}</div>`);
     gsRem.slice(-3).forEach(g => {
       const iconos = {promesa:'🟡',nocontesta:'📵',negado:'🚫',equivocado:'❌',nodisponible:'📴'};
       notas += `<div style="font-size:0.8rem;color:var(--text2);padding:2px 0">${iconos[g.resultado]||'📌'} ${g.resultado} — ${fmtFecha(g.fecha)}${g.nota?' · '+g.nota:''}</div>`;
@@ -2647,6 +2643,42 @@ function togglePagarTodoCliente() {
     fmtInput(input);
     btn.textContent = 'Limpiar';
     input.focus();
+  }
+}
+
+async function eliminarAbono(abonoId, remId, nombreCliente) {
+  const abono = abonos.find(a => a.id === abonoId);
+  if (!abono) return;
+  const rem = remisiones.find(r => r.id === remId);
+  if (!rem) return;
+
+  const confirmar = confirm(`¿Eliminar este abono de ${fmt(abono.valor)}?\n\nEsta acción ajustará el saldo de la remisión.`);
+  if (!confirmar) return;
+
+  toast('Eliminando abono...');
+  try {
+    // Marcar abono como eliminado en Sheets (updateById con valor 0 y nota especial)
+    await apiCall('updateById', 'Abonos', abonoId, [abonoId, abono.fecha, remId, 0, '__ELIMINADO__']);
+
+    // Recalcular abonado de la remisión
+    const nuevoAbonado = Math.max(0, rem.abonado - abono.valor);
+    const nuevoEstado = rem.estado === 'cancelada' ? 'activa' : rem.estado;
+    await fetch(`${API}?action=updateById&sheet=Remisiones&id=${rem.id}&values=${encodeURIComponent(JSON.stringify([
+      rem.id, rem.fecha, rem.cliente, rem.cel, rem.doc||'', rem.num, rem.total, nuevoAbonado, nuevoEstado
+    ]))}`);
+
+    // Actualizar estado local
+    rem.abonado = nuevoAbonado;
+    rem.estado = nuevoEstado;
+    const idx = abonos.findIndex(a => a.id === abonoId);
+    if (idx >= 0) abonos.splice(idx, 1);
+
+    toast(`Abono de ${fmt(abono.valor)} eliminado ✓`);
+    updateSidebar();
+    if (isAdmin()) renderDashboard();
+    abrirCliente(nombreCliente);
+  } catch(e) {
+    toast('Error eliminando abono', true);
   }
 }
 
